@@ -1,0 +1,6 @@
+{
+  "name": "Creative Engineer Portfolio",
+  "description": "High-performance, minimalist portfolio website for a Creative Engineer featuring capabilities, interactive work modals, and grounded AI assistant.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
