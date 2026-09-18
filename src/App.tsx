@@ -12,7 +12,7 @@ import { WorkSection } from './components/WorkSection.tsx';
 import { ProjectModal } from './components/ProjectModal.tsx';
 import { ContactForm } from './components/ContactForm.tsx';
 import { Footer } from './components/Footer.tsx';
-import { AiChatAssistant } from './components/AiChatAssistant.tsx';
+import { GeminiChatbox } from './components/GeminiChatbox.tsx';
 import { StudioCMSModal } from './components/StudioCMSModal.tsx';
 import type { PortfolioItem } from './types.ts';
 import StudioPage from '../app/studio/[[...tool]]/page.tsx';
@@ -90,8 +90,8 @@ export default function App() {
         onClose={() => setSelectedProject(null)}
       />
 
-      {/* Grounded Studio AI Chat Assistant */}
-      <AiChatAssistant
+      {/* Multi-Turn Gemini Chatbot */}
+      <GeminiChatbox
         isOpen={isAiChatOpen}
         onToggle={() => setIsAiChatOpen(!isAiChatOpen)}
       />
