@@ -1,5 +1,5 @@
 import { GoogleGenAI } from '@google/genai';
-import { siteConfig, capabilities, portfolioWork } from '../../../src/data/data';
+import { siteConfig, capabilities, portfolioWork } from '../../../src/data/data.ts';
 
 export async function POST(req: Request) {
   try {
