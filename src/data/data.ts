@@ -1,4 +1,4 @@
-import { Capability, PortfolioItem, SiteConfig, GallerySpot } from './types.ts';
+import { Capability, PortfolioItem, SiteConfig, GallerySpot } from './types';
 import { createClient } from 'next-sanity';
 
 // Read-only Sanity client initialized with hardcoded project credentials

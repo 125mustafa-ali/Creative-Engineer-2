@@ -1,6 +1,6 @@
 import { GoogleGenAI } from '@google/genai';
-import { fetchLiveStudioContext } from '../src/lib/sanityChatContext.js';
-import { siteConfig, capabilities, portfolioWork } from '../src/data/data.js';
+import { fetchLiveStudioContext } from '../src/lib/sanityChatContext';
+import { siteConfig, capabilities, portfolioWork } from '../src/data/data';
 
 export default async function handler(req: any, res?: any) {
   // CORS Headers
