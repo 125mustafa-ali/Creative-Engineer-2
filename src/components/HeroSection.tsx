@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowDownRight, Compass, ShieldCheck } from 'lucide-react';
+import { ArrowDownRight, Compass, ShieldCheck, MessageCircle } from 'lucide-react';
 import { siteConfig, client } from '../data/data.ts';
 import { HeroData } from '../data/types.ts';
 
@@ -113,19 +113,17 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onOpenAiChat }) => {
             >
               <span>Initiate Dialogue</span>
             </a>
-            <button
-              onClick={onOpenAiChat}
-              id="hero-cta-gemini-chatbox"
-              type="button"
-              className="group inline-flex items-center gap-2.5 px-5 py-2.5 rounded-full bg-neutral-950 text-neutral-50 shadow-xs hover:bg-neutral-800 transition-all duration-300 border border-neutral-800 hover:scale-105 active:scale-95 cursor-pointer font-sans text-xs font-medium tracking-wide"
-              aria-label="Open Gemini Chatbot"
+            <a
+              href="https://wa.me/971545648341"
+              target="_blank"
+              rel="noopener noreferrer"
+              id="hero-cta-whatsapp"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-md border border-neutral-300 bg-transparent text-neutral-900 font-mono text-xs tracking-wider uppercase hover:bg-neutral-100 hover:border-neutral-400 transition-colors"
+              aria-label="Contact via WhatsApp"
             >
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-              </span>
-              <span>✨ Gemini Chatbot</span>
-            </button>
+              <MessageCircle className="w-3.5 h-3.5 text-emerald-600" />
+              <span>WhatsApp</span>
+            </a>
           </div>
         </div>
 

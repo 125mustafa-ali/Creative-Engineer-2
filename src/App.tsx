@@ -90,7 +90,7 @@ export default function App() {
         onClose={() => setSelectedProject(null)}
       />
 
-      {/* Multi-Turn Gemini Chatbot */}
+      {/* Multi-Turn Ask AI */}
       <GeminiChatbox
         isOpen={isAiChatOpen}
         onToggle={() => setIsAiChatOpen(!isAiChatOpen)}

@@ -236,14 +236,14 @@ export const GeminiChatbox: React.FC<GeminiChatboxProps> = ({
           id="gemini-chatbot-floating-button"
           type="button"
           className="group inline-flex items-center gap-2.5 px-5 py-3 rounded-full bg-neutral-950 text-neutral-50 shadow-2xl hover:bg-neutral-800 transition-all duration-300 border border-neutral-800 hover:scale-105 active:scale-95 cursor-pointer font-sans text-xs sm:text-sm font-medium tracking-wide"
-          aria-label="Open Gemini Chatbot"
+          aria-label="Open Ask AI"
         >
           <span className="relative flex h-2 w-2">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
             <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
           </span>
           <Bot className="w-4 h-4 text-emerald-400" />
-          <span>Gemini Chatbot</span>
+          <span>Ask AI</span>
         </button>
       ) : (
         <div
@@ -259,7 +259,7 @@ export const GeminiChatbox: React.FC<GeminiChatboxProps> = ({
               <div>
                 <div className="flex items-center gap-2">
                   <span className="font-sans text-xs font-semibold text-white">
-                    Gemini Chatbot
+                    Ask AI
                   </span>
                   <span className="px-1.5 py-0.5 rounded text-[9px] font-mono uppercase tracking-wider bg-neutral-800 text-neutral-300 border border-neutral-700">
                     {currentRoleConfig.model}
@@ -288,7 +288,7 @@ export const GeminiChatbox: React.FC<GeminiChatboxProps> = ({
                 id="gemini-chatbot-close-btn"
                 type="button"
                 className="p-1.5 rounded-md text-neutral-400 hover:text-white hover:bg-neutral-800 transition-colors"
-                aria-label="Close chatbot window"
+                aria-label="Close Ask AI window"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -361,7 +361,7 @@ export const GeminiChatbox: React.FC<GeminiChatboxProps> = ({
                 >
                   <div className="flex items-center gap-2 mb-1 px-1">
                     <span className="font-mono text-[9px] uppercase tracking-widest text-neutral-400">
-                      {isUser ? 'YOU' : isError ? 'NOTICE' : 'GEMINI CHATBOT'}
+                      {isUser ? 'YOU' : isError ? 'NOTICE' : 'ASK AI'}
                     </span>
                     {!isUser && msg.modelUsed && !isError && (
                       <span className="font-mono text-[8px] px-1 py-0.2 rounded bg-neutral-200 text-neutral-600">
@@ -401,7 +401,7 @@ export const GeminiChatbox: React.FC<GeminiChatboxProps> = ({
               <div className="flex flex-col items-start">
                 <div className="flex items-center gap-2 mb-1 px-1">
                   <span className="font-mono text-[9px] uppercase tracking-widest text-neutral-400">
-                    GEMINI CHATBOT
+                    ASK AI
                   </span>
                   <span className="font-mono text-[8px] px-1 py-0.2 rounded bg-neutral-200 text-neutral-600">
                     {currentRoleConfig.model}
@@ -439,7 +439,7 @@ export const GeminiChatbox: React.FC<GeminiChatboxProps> = ({
               type="submit"
               disabled={isLoading || !input.trim()}
               className="p-2.5 rounded-md bg-neutral-950 text-neutral-50 hover:bg-neutral-800 disabled:opacity-40 disabled:hover:bg-neutral-950 transition-colors shrink-0 cursor-pointer"
-              aria-label="Send message to Gemini chatbot"
+              aria-label="Send message to Ask AI"
             >
               <Send className="w-3.5 h-3.5" />
             </button>
