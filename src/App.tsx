@@ -4,7 +4,6 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import Link from 'next/link';
 import { Navigation } from './components/Navigation.tsx';
 import { HeroSection } from './components/HeroSection.tsx';
 import { CapabilitiesSection } from './components/CapabilitiesSection.tsx';
@@ -32,6 +31,7 @@ export default function App() {
   useEffect(() => {
     const handleLocationChange = () => {
       setCurrentPath(window.location.pathname);
+      window.dispatchEvent(new CustomEvent('sanity:refresh'));
     };
 
     window.addEventListener('popstate', handleLocationChange);
@@ -48,18 +48,6 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-neutral-50 text-neutral-950 flex flex-col selection:bg-neutral-900 selection:text-neutral-50">
-      {/* Temporary CMS Login Button */}
-      <Link
-        href="/studio"
-        className="fixed top-4 right-4 z-50 bg-white text-black px-4 py-2 rounded-md text-sm font-bold border border-neutral-200 shadow-sm hover:bg-neutral-100 transition-colors"
-        onClick={() => {
-          setCurrentPath('/studio');
-          window.history.pushState({}, '', '/studio');
-        }}
-      >
-        CMS Login
-      </Link>
-
       {/* Top Sticky Navigation */}
       <Navigation
         onOpenStudio={() => setIsCmsModalOpen(true)}

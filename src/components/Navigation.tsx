@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowUpRight } from 'lucide-react';
 import { siteConfig } from '../data/data.ts';
 
 interface NavigationProps {
@@ -53,15 +52,6 @@ export const Navigation: React.FC<NavigationProps> = ({ onOpenStudio }) => {
               0{idx + 1} // {link.label}
             </a>
           ))}
-
-          {/* Quick Studio CMS link */}
-          <a
-            href="/studio"
-            id="nav-link-cms"
-            className="text-[10px] text-neutral-400 hover:text-neutral-950 transition-colors flex items-center gap-1 border border-neutral-200 px-2 py-0.5 rounded-sm"
-          >
-            CMS Studio <ArrowUpRight className="w-2.5 h-2.5" />
-          </a>
         </nav>
 
         {/* Mobile Toggle Button */}
@@ -92,14 +82,6 @@ export const Navigation: React.FC<NavigationProps> = ({ onOpenStudio }) => {
               0{idx + 1} // {link.label}
             </a>
           ))}
-
-          <a
-            href="/studio"
-            onClick={() => setMobileMenuOpen(false)}
-            className="block w-full text-left py-2 text-neutral-500 hover:text-neutral-950"
-          >
-            CMS Studio (/studio) ↗
-          </a>
         </div>
       )}
     </header>

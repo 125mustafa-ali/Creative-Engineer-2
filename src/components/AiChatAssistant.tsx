@@ -388,7 +388,7 @@ export const GeminiChatbox: React.FC<GeminiChatboxProps> = ({
                     {isUser ? (
                       <p className="whitespace-pre-wrap">{msg.content}</p>
                     ) : (
-                      <div className="markdown-body space-y-2 text-xs sm:text-sm">
+                      <div className="prose prose-sm prose-invert prose-headings:text-base prose-headings:font-bold prose-p:leading-snug max-w-none">
                         <Markdown>{msg.content}</Markdown>
                       </div>
                     )}

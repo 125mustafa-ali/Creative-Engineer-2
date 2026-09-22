@@ -54,6 +54,7 @@ export interface GallerySpot {
   aspectRatio?: string; // e.g. "16:9" | "9:16"
   duration?: string;
   markdownContext: string;
+  context?: string;
   heroReelUrl?: string;
   fullVideoUrl?: string;
   prompts?: string[];
@@ -71,6 +72,7 @@ export interface PortfolioItem {
   year: string;
   discipline: string;
   markdownContext: string;
+  context?: string;
   isAnthology?: boolean;
   gallery?: GallerySpot[];
   anthologySpots?: GallerySpot[];

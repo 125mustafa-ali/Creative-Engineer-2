@@ -20,7 +20,16 @@ export async function fetchLiveStudioContext(): Promise<LiveSanityPayload> {
   const query = `{
     "hero": *[_id == "hero-singleton"][0],
     "capabilities": *[_type == "capability"] | order(_createdAt asc),
-    "portfolio": *[_type == "portfolioItem"] | order(order asc)
+    "portfolio": *[_type == "portfolioItem"] | order(order asc) {
+      ...,
+      context,
+      markdownContext,
+      "spots": coalesce(spots, anthologySpots, anthology, anthologyItems, items)[] {
+        ...,
+        context,
+        markdownContext
+      }
+    }
   }`;
 
   // 3. Fetch & Serialize with Fallback Mandate

@@ -18,7 +18,8 @@ export const portfolioItem = defineType({
     }),
     defineField({ name: 'videoUrl', title: 'Main Video URL (Cloudinary)', type: 'url' }),
     defineField({ name: 'thumbnailVideo', title: 'Thumbnail Video URL', type: 'url' }),
-    defineField({ name: 'markdownContext', title: 'Context (Markdown)', type: 'text' }),
+    defineField({ name: 'context', title: 'Context (Markdown)', type: 'text' }),
+    defineField({ name: 'markdownContext', title: 'Context / Dossier (Markdown)', type: 'text' }),
     defineField({ 
       name: 'isAnthology', 
       title: 'Is this an Anthology / Gallery?', 
@@ -44,7 +45,8 @@ export const portfolioItem = defineType({
           }),
           defineField({ name: 'badge', title: 'Badge Text', type: 'string' }),
           defineField({ name: 'tag', title: 'Tag (e.g., Spec, Live)', type: 'string' }),
-          defineField({ name: 'markdownContext', title: 'Context (Markdown)', type: 'text' }),
+          defineField({ name: 'context', title: 'Context (Markdown)', type: 'text' }),
+          defineField({ name: 'markdownContext', title: 'Context (Markdown Alternative)', type: 'text' }),
         ]
       }]
     })

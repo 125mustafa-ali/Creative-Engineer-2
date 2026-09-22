@@ -10,7 +10,16 @@ async function fetchLiveStudioContext() {
   const query = `{
     "hero": *[_id == "hero-singleton"][0],
     "capabilities": *[_type == "capability"] | order(_createdAt asc),
-    "portfolio": *[_type == "portfolioItem"] | order(order asc)
+    "portfolio": *[_type == "portfolioItem"] | order(order asc) {
+      ...,
+      context,
+      markdownContext,
+      "spots": coalesce(spots, anthologySpots, anthology, anthologyItems, items)[] {
+        ...,
+        context,
+        markdownContext
+      }
+    }
   }`;
   try {
     const data = await client.fetch(query);

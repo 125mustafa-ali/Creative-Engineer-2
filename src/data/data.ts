@@ -1,4 +1,4 @@
-import { Capability, PortfolioItem, SiteConfig, GallerySpot } from './types.ts';
+import { Capability, PortfolioItem, SiteConfig, GallerySpot, HeroData } from './types.ts';
 import { createClient } from 'next-sanity';
 
 // Read-only Sanity client initialized with hardcoded project credentials
@@ -456,23 +456,74 @@ And share this with someone who needs to hear it today.`,
  */
 export async function fetchPortfolioWork(): Promise<PortfolioItem[]> {
   try {
-    const query = '*[_type == "portfolioItem"] | order(order asc, _createdAt asc)';
-    const sanityData = await client.fetch<any[]>(query);
+    const query = `*[_type == "portfolioItem"] | order(order asc, _createdAt asc) {
+      _id,
+      id,
+      title,
+      order,
+      client,
+      year,
+      discipline,
+      size,
+      videoUrl,
+      thumbnailVideo,
+      markdownContext,
+      context,
+      isAnthology,
+      "spots": coalesce(spots, anthologySpots, anthology, anthologyItems, items)[] {
+        title,
+        videoUrl,
+        heroReelUrl,
+        fullVideoUrl,
+        duration,
+        aspectRatio,
+        badge,
+        tag,
+        context,
+        markdownContext
+      },
+      "anthologySpots": coalesce(spots, anthologySpots, anthology, anthologyItems, items)[] {
+        title,
+        videoUrl,
+        heroReelUrl,
+        fullVideoUrl,
+        duration,
+        aspectRatio,
+        badge,
+        tag,
+        context,
+        markdownContext
+      }
+    }`;
+    const sanityData = await (client as any).fetch(
+      query,
+      {},
+      {
+        cache: 'no-store',
+      }
+    );
 
     if (Array.isArray(sanityData) && sanityData.length > 0) {
       // Map Sanity documents seamlessly to frontend PortfolioItem interface
       const mappedData: PortfolioItem[] = sanityData.map((doc, index) => {
-        const mappedSpots: GallerySpot[] = Array.isArray(doc.spots)
-          ? doc.spots.map((spot: any) => ({
-              title: spot.title || '',
-              videoUrl: spot.videoUrl || '',
-              tag: spot.tag || '',
-              badge: spot.badge || '',
-              aspectRatio: spot.aspectRatio || '16:9',
-              duration: spot.duration || '',
-              markdownContext: spot.markdownContext || '',
-            }))
+        const rawSpots = doc.spots || doc.anthologySpots || doc.anthology || doc.anthologyItems || doc.items || [];
+        const mappedSpots: GallerySpot[] = Array.isArray(rawSpots)
+          ? rawSpots.map((spot: any) => {
+              const spotContext = spot.context || spot.markdownContext || '';
+              return {
+                title: spot.title || '',
+                videoUrl: spot.videoUrl || spot.fullVideoUrl || spot.heroReelUrl || '',
+                tag: spot.tag || '',
+                badge: spot.badge || '',
+                aspectRatio: spot.aspectRatio || '16:9',
+                duration: spot.duration || '',
+                markdownContext: spotContext,
+                context: spotContext,
+              };
+            })
           : [];
+
+        const projectContext = doc.context || doc.markdownContext || '';
 
         return {
           id: doc.id || doc._id || `sanity-${index + 1}`,
@@ -483,7 +534,8 @@ export async function fetchPortfolioWork(): Promise<PortfolioItem[]> {
           size: (doc.size ? doc.size.toLowerCase() : 'small') as 'large' | 'small',
           videoUrl: doc.videoUrl || (mappedSpots[0]?.videoUrl ?? ''),
           thumbnailVideo: doc.thumbnailVideo || doc.videoUrl || (mappedSpots[0]?.videoUrl ?? ''),
-          markdownContext: doc.markdownContext || '',
+          markdownContext: projectContext,
+          context: projectContext,
           isAnthology: Boolean(doc.isAnthology),
           spots: mappedSpots,
           gallery: mappedSpots,
@@ -509,3 +561,27 @@ export const getPortfolioWork = fetchPortfolioWork;
 export const fetchSanityData = fetchPortfolioWork;
 export const fetchData = fetchPortfolioWork;
 export const getFrontendData = fetchPortfolioWork;
+
+/**
+ * Frontend data fetching utility for the Hero singleton document (_id == "hero-singleton").
+ * Supports `forceFresh: true` to bypass CDN/browser caching when revalidating.
+ */
+export async function fetchHeroData(options: { forceFresh?: boolean } = {}): Promise<HeroData | null> {
+  try {
+    const heroQuery = '*[_id == "hero-singleton"][0]';
+    const targetClient = options.forceFresh ? client.withConfig({ useCdn: false }) : client;
+    const data = await (targetClient as any).fetch(
+      heroQuery,
+      {},
+      {
+        cache: 'no-store',
+      }
+    );
+    return (data as HeroData) || null;
+  } catch (error) {
+    console.warn('Sanity Hero fetch encountered an error, using fallback:', error);
+    return null;
+  }
+}
+
+export const getHeroData = fetchHeroData;

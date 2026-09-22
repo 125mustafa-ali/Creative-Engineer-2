@@ -13,22 +13,45 @@ export const WorkSection: React.FC<WorkSectionProps> = ({ onSelectProject }) => 
 
   useEffect(() => {
     let isMounted = true;
-    setIsLoading(true);
-    fetchPortfolioWork()
-      .then((data) => {
-        if (isMounted && data && data.length > 0) {
-          setWorks(data);
-        }
-      })
-      .catch((err) => {
-        console.warn('Fallback to local portfolio data:', err);
-      })
-      .finally(() => {
-        if (isMounted) setIsLoading(false);
-      });
+    let lastFetched = 0;
+    const STALE_TIME = 30 * 1000;
+
+    const loadData = () => {
+      setIsLoading(true);
+      fetchPortfolioWork()
+        .then((data) => {
+          if (isMounted && data && data.length > 0) {
+            setWorks(data);
+            lastFetched = Date.now();
+          }
+        })
+        .catch((err) => {
+          console.warn('Fallback to local portfolio data:', err);
+        })
+        .finally(() => {
+          if (isMounted) setIsLoading(false);
+        });
+    };
+
+    loadData();
+
+    const handleFocus = () => {
+      if (Date.now() - lastFetched > STALE_TIME) {
+        loadData();
+      }
+    };
+
+    const handleRefresh = () => {
+      loadData();
+    };
+
+    window.addEventListener('focus', handleFocus);
+    window.addEventListener('sanity:refresh', handleRefresh);
 
     return () => {
       isMounted = false;
+      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('sanity:refresh', handleRefresh);
     };
   }, []);
 

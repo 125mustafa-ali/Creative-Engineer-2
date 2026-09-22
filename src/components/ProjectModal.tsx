@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import Markdown from 'react-markdown';
+import ReactMarkdown from 'react-markdown';
 import { X, Play, Film, ChevronRight, Check } from 'lucide-react';
 import type { PortfolioItem, GallerySpot } from '../types.ts';
 
@@ -16,9 +16,10 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
 }) => {
   const [selectedSpotIndex, setSelectedSpotIndex] = useState<number>(0);
 
-  // Normalize spots array from either gallery or anthologySpots
+  // Normalize spots array from either spots, gallery, or anthologySpots
   const spots: GallerySpot[] = React.useMemo(() => {
     if (!project) return [];
+    if (project.spots && project.spots.length > 0) return project.spots;
     if (project.gallery && project.gallery.length > 0) return project.gallery;
     if (project.anthologySpots && project.anthologySpots.length > 0) return project.anthologySpots;
     return [];
@@ -61,8 +62,8 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
     isAnthology && spots[selectedSpotIndex] ? spots[selectedSpotIndex] : null;
 
   const currentMarkdown = activeSpot
-    ? activeSpot.markdownContext
-    : project.markdownContext;
+    ? (activeSpot.context || activeSpot.markdownContext || '')
+    : (project.context || project.markdownContext || '');
 
   const currentAspectRatio = (activeSpot?.aspectRatio || project.aspectRatio || '16:9').trim();
   const isVertical = currentAspectRatio === '9:16' || currentAspectRatio === 'vertical';
@@ -389,10 +390,12 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
                 </button>
               )}
             </div>
-            <div className="markdown-body prose prose-neutral max-w-none text-neutral-800 font-sans leading-relaxed text-sm sm:text-base space-y-4">
-              <Markdown>
-                {selectedSpotIndex === -1 ? project.markdownContext : currentMarkdown}
-              </Markdown>
+            <div className="prose prose-invert max-w-none">
+              <ReactMarkdown>
+                {selectedSpotIndex === -1
+                  ? (project.context || project.markdownContext || '')
+                  : currentMarkdown}
+              </ReactMarkdown>
             </div>
           </div>
         </div>

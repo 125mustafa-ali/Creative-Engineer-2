@@ -1,7 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { ArrowDownRight, Compass, ShieldCheck, MessageCircle } from 'lucide-react';
-import { siteConfig, client } from '../data/data.ts';
+import { siteConfig, fetchHeroData } from '../data/data.ts';
 import { HeroData } from '../data/types.ts';
+
+// 30 seconds stale time threshold to align with CDN invalidation propagation
+const STALE_TIME_MS = 30 * 1000;
 
 interface HeroSectionProps {
   onOpenAiChat?: () => void;
@@ -12,25 +15,73 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onOpenAiChat }) => {
   const [detectedRatio, setDetectedRatio] = useState<'9:16' | '16:9'>('9:16');
   const [isMuted, setIsMuted] = useState(true);
 
-  useEffect(() => {
-    let isMounted = true;
-    async function fetchHero() {
-      try {
-        // Precise Singleton GROQ Query
-        const heroQuery = '*[_id == "hero-singleton"][0]';
-        const data = await client.fetch<HeroData>(heroQuery);
-        if (isMounted && data) {
-          setHeroData(data);
-        }
-      } catch (err) {
-        console.warn('Sanity hero fetch error, using fallback:', err);
+  const lastFetchedRef = useRef<number>(0);
+  const isFetchingRef = useRef<boolean>(false);
+
+  const loadHero = useCallback(async (forceFresh = false) => {
+    if (isFetchingRef.current) return;
+    isFetchingRef.current = true;
+    try {
+      const data = await fetchHeroData({ forceFresh });
+      if (data) {
+        setHeroData(data);
+        lastFetchedRef.current = Date.now();
       }
+    } catch (err) {
+      console.warn('Sanity hero fetch error, using fallback:', err);
+    } finally {
+      isFetchingRef.current = false;
     }
-    fetchHero();
-    return () => {
-      isMounted = false;
-    };
   }, []);
+
+  useEffect(() => {
+    // 1. Initial mount fetch (fast path)
+    loadHero(false);
+
+    // 2. Refetch on window focus if staleTime has elapsed
+    const handleFocus = () => {
+      const timeSinceLastFetch = Date.now() - lastFetchedRef.current;
+      if (timeSinceLastFetch > STALE_TIME_MS) {
+        loadHero(true);
+      }
+    };
+
+    // 3. Refetch when user returns to this tab
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        const timeSinceLastFetch = Date.now() - lastFetchedRef.current;
+        if (timeSinceLastFetch > STALE_TIME_MS) {
+          loadHero(true);
+        }
+      }
+    };
+
+    // 4. Custom event for immediate CMS revalidation
+    const handleCustomRefresh = () => {
+      loadHero(true);
+    };
+
+    // 5. Periodic background revalidation while window remains active
+    const intervalId = window.setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        const timeSinceLastFetch = Date.now() - lastFetchedRef.current;
+        if (timeSinceLastFetch > STALE_TIME_MS) {
+          loadHero(true);
+        }
+      }
+    }, 60 * 1000);
+
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('sanity:refresh', handleCustomRefresh);
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('sanity:refresh', handleCustomRefresh);
+      window.clearInterval(intervalId);
+    };
+  }, [loadHero]);
 
   // Resilient Fallback Injection (Zero Layout Shift)
   const heading = heroData?.heading || siteConfig.heroStatement || 'CREATIVE ENGINEER';
