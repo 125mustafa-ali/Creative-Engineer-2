@@ -229,29 +229,35 @@ export default async function handler(req, res) {
       parts: [{ text: message.trim() }],
     });
 
-    // 5. Select Gemini model based on user intent and task complexity:
-    // - gemini-3.1-pro-preview for particularly complex tasks
-    // - gemini-3.5-flash for general tasks
-    // - gemini-3.1-flash-lite for tasks that should happen fast
-    let model = 'gemini-3.5-flash';
-    if (requestedModel) {
-      model = requestedModel;
-    } else if (taskType === 'complex' || role === 'technical-architect' || role === 'complex') {
-      model = 'gemini-3.1-pro-preview';
-    } else if (taskType === 'fast' || role === 'fast-concierge' || role === 'fast') {
-      model = 'gemini-3.1-flash-lite';
-    } else {
-      model = process.env.GEMINI_MODEL || 'gemini-3.5-flash';
-    }
+    // 5. Select Gemini model
+    let model = requestedModel || process.env.GEMINI_MODEL || 'gemini-3.6-flash';
 
-    const response = await ai.models.generateContent({
-      model,
-      contents: conversationContents,
-      config: {
-        systemInstruction,
-        temperature: role === 'technical-architect' || taskType === 'complex' ? 0.2 : 0.4,
-      },
-    });
+    let response;
+    try {
+      response = await ai.models.generateContent({
+        model,
+        contents: conversationContents,
+        config: {
+          systemInstruction,
+          temperature: 0.4,
+        },
+      });
+    } catch (modelErr) {
+      if (model !== 'gemini-3.6-flash') {
+        console.warn(`Model ${model} failed, falling back to gemini-3.6-flash:`, modelErr);
+        model = 'gemini-3.6-flash';
+        response = await ai.models.generateContent({
+          model,
+          contents: conversationContents,
+          config: {
+            systemInstruction,
+            temperature: 0.4,
+          },
+        });
+      } else {
+        throw modelErr;
+      }
+    }
 
     const reply = response.text || '';
 

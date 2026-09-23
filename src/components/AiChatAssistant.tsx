@@ -1,15 +1,13 @@
 import React, { useState, useRef, useEffect } from 'react';
 import Markdown from 'react-markdown';
-import { X, Send, RotateCcw, Bot, Zap, Cpu, Compass, Sparkles, AlertCircle } from 'lucide-react';
-import { siteConfig } from '../data/data.ts';
+import { X, Send, RotateCcw, Bot, Sparkles, AlertCircle } from 'lucide-react';
 
-export type ChatbotRole = 'studio-guide' | 'technical-architect' | 'fast-concierge';
+export type ChatbotRole = 'studio-guide' | string;
 
 export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
   content: string;
-  modelUsed?: string;
   timestamp?: string;
 }
 
@@ -18,82 +16,25 @@ export interface GeminiChatboxProps {
   onToggle: () => void;
 }
 
-interface RoleConfig {
-  id: ChatbotRole;
-  name: string;
-  taskLabel: string;
-  model: 'gemini-3.5-flash' | 'gemini-3.1-pro-preview' | 'gemini-3.1-flash-lite';
-  icon: React.ComponentType<{ className?: string }>;
-  description: string;
-  welcomeMessage: string;
-  suggestedQueries: string[];
-}
+const INITIAL_GREETING =
+  'Hi there! I’m Mustafa’s AI assistant, grounded directly in his portfolio and studio data. How can I help you explore his work today?';
 
-const ROLES: Record<ChatbotRole, RoleConfig> = {
-  'studio-guide': {
-    id: 'studio-guide',
-    name: 'Studio Guide',
-    taskLabel: 'General Tasks',
-    model: 'gemini-3.5-flash',
-    icon: Compass,
-    description: 'Explores portfolio works, design philosophy, and capabilities',
-    welcomeMessage: `Hello! I am your **Gemini Studio Guide** (powered by **gemini-3.5-flash**).
-
-I'm grounded directly in Mustafa's portfolio archive and live studio knowledge base. How can I help you explore our creative engineering work today?`,
-    suggestedQueries: [
-      'What are Mustafa’s core capabilities?',
-      'Tell me about the Security Automation Playbook.',
-      'What commercial storytelling projects exist?',
-      'Are you taking on new client projects?',
-    ],
-  },
-  'technical-architect': {
-    id: 'technical-architect',
-    name: 'Tech Architect',
-    taskLabel: 'Complex Tasks',
-    model: 'gemini-3.1-pro-preview',
-    icon: Cpu,
-    description: 'Deep technical analysis: n8n, Cisco ISE, Fortinet APIs, & React',
-    welcomeMessage: `Welcome to the **Gemini Technical Architect** console (powered by **gemini-3.1-pro-preview** for complex reasoning).
-
-I specialize in architectural breakdowns of security automation pipelines, webhook triaging, network integrations (Cisco ISE, Fortinet), and high-performance React/Tailwind frontend systems. What technical challenge would you like to explore?`,
-    suggestedQueries: [
-      'Break down the n8n Cisco ISE webhook architecture.',
-      'How are security incident pipelines automated?',
-      'Explain the React 19 and Tailwind architecture here.',
-      'How does the Sanity CMS and Gemini grounding work?',
-    ],
-  },
-  'fast-concierge': {
-    id: 'fast-concierge',
-    name: 'Fast Concierge',
-    taskLabel: 'Fast Tasks',
-    model: 'gemini-3.1-flash-lite',
-    icon: Zap,
-    description: 'Rapid, concise Q&A on booking, status, and studio location',
-    welcomeMessage: `**Gemini Fast Concierge** ready (powered by **gemini-3.1-flash-lite** for near-instant responses).
-
-Ask me anything for immediate, concise answers regarding availability, atelier locations, and contact details.`,
-    suggestedQueries: [
-      'What is current project availability?',
-      'Where are the studio ateliers located?',
-      'How do I contact Mustafa directly?',
-      'What is the studio phone number?',
-    ],
-  },
-};
+const SUGGESTED_QUERIES = [
+  'What are Mustafa’s core capabilities?',
+  'Tell me about the Security Automation Playbook.',
+  'What commercial storytelling projects exist?',
+  'Are you accepting new client projects?',
+];
 
 export const GeminiChatbox: React.FC<GeminiChatboxProps> = ({
   isOpen,
   onToggle,
 }) => {
-  const [activeRole, setActiveRole] = useState<ChatbotRole>('studio-guide');
   const [messages, setMessages] = useState<ChatMessage[]>(() => [
     {
       id: 'msg-init',
       role: 'assistant',
-      content: ROLES['studio-guide'].welcomeMessage,
-      modelUsed: ROLES['studio-guide'].model,
+      content: INITIAL_GREETING,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     },
   ]);
@@ -101,8 +42,6 @@ export const GeminiChatbox: React.FC<GeminiChatboxProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-
-  const currentRoleConfig = ROLES[activeRole];
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -114,24 +53,6 @@ export const GeminiChatbox: React.FC<GeminiChatboxProps> = ({
       setTimeout(() => inputRef.current?.focus(), 150);
     }
   }, [isOpen, messages, isLoading]);
-
-  // Handle switching roles and appending system transition announcement
-  const handleRoleChange = (newRole: ChatbotRole) => {
-    if (newRole === activeRole) return;
-    setActiveRole(newRole);
-
-    const newConfig = ROLES[newRole];
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: `role-switch-${Date.now()}`,
-        role: 'assistant',
-        content: `*Switched role to **${newConfig.name}** (${newConfig.taskLabel} • Model: \`${newConfig.model}\`)*\n\n${newConfig.welcomeMessage}`,
-        modelUsed: newConfig.model,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      },
-    ]);
-  };
 
   const handleSendMessage = async (queryText?: string) => {
     const textToSend = queryText || input;
@@ -151,9 +72,9 @@ export const GeminiChatbox: React.FC<GeminiChatboxProps> = ({
     setIsLoading(true);
 
     try {
-      // Build conversation history excluding initial greeting or notices
+      // Build conversation history excluding initial greeting or error banners
       const payloadHistory = messages
-        .filter((m) => !m.id.startsWith('role-switch-') && !m.id.startsWith('err-'))
+        .filter((m) => !m.id.startsWith('err-') && m.id !== 'msg-init')
         .map((m) => ({
           role: m.role === 'user' ? 'user' : 'model',
           content: m.content,
@@ -167,14 +88,7 @@ export const GeminiChatbox: React.FC<GeminiChatboxProps> = ({
         body: JSON.stringify({
           message: textToSend.trim(),
           history: payloadHistory,
-          role: activeRole,
-          model: currentRoleConfig.model,
-          taskType:
-            activeRole === 'technical-architect'
-              ? 'complex'
-              : activeRole === 'fast-concierge'
-              ? 'fast'
-              : 'general',
+          role: 'studio-guide',
         }),
       });
 
@@ -192,7 +106,6 @@ export const GeminiChatbox: React.FC<GeminiChatboxProps> = ({
         id: `ast-${Date.now()}`,
         role: 'assistant',
         content: data.reply,
-        modelUsed: data.modelUsed || currentRoleConfig.model,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
 
@@ -207,7 +120,6 @@ export const GeminiChatbox: React.FC<GeminiChatboxProps> = ({
           id: `err-${Date.now()}`,
           role: 'assistant',
           content: `⚠️ ${errorMessage}`,
-          modelUsed: currentRoleConfig.model,
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         },
       ]);
@@ -221,8 +133,7 @@ export const GeminiChatbox: React.FC<GeminiChatboxProps> = ({
       {
         id: `msg-reset-${Date.now()}`,
         role: 'assistant',
-        content: currentRoleConfig.welcomeMessage,
-        modelUsed: currentRoleConfig.model,
+        content: INITIAL_GREETING,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       },
     ]);
@@ -248,27 +159,22 @@ export const GeminiChatbox: React.FC<GeminiChatboxProps> = ({
       ) : (
         <div
           id="gemini-chatbot-window"
-          className="w-[92vw] sm:w-[440px] md:w-[480px] h-[580px] max-h-[88vh] bg-neutral-50 border border-neutral-300 rounded-xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-6 duration-200"
+          className="w-[92vw] sm:w-[440px] md:w-[480px] h-[560px] max-h-[88vh] bg-neutral-50 border border-neutral-300 rounded-xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-6 duration-200"
         >
-          {/* Header */}
+          {/* Clean, Minimal Header */}
           <div className="flex items-center justify-between px-4 py-3 bg-neutral-950 text-neutral-50 shrink-0 border-b border-neutral-800">
             <div className="flex items-center gap-2.5">
               <div className="w-7 h-7 rounded-lg bg-neutral-800 border border-neutral-700 flex items-center justify-center text-emerald-400">
                 <Bot className="w-4 h-4" />
               </div>
               <div>
-                <div className="flex items-center gap-2">
-                  <span className="font-sans text-xs font-semibold text-white">
-                    Ask AI
-                  </span>
-                  <span className="px-1.5 py-0.5 rounded text-[9px] font-mono uppercase tracking-wider bg-neutral-800 text-neutral-300 border border-neutral-700">
-                    {currentRoleConfig.model}
-                  </span>
-                </div>
-                <span className="font-mono text-[9px] uppercase tracking-wider text-neutral-400 flex items-center gap-1.5 mt-0.5">
+                <h3 className="font-sans text-xs font-semibold text-white leading-tight">
+                  Ask AI
+                </h3>
+                <p className="text-[10px] text-neutral-400 flex items-center gap-1.5 leading-tight mt-0.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block"></span>
-                  Multi-Turn Grounded AI • {currentRoleConfig.taskLabel}
-                </span>
+                  <span>Grounded in Studio Data</span>
+                </p>
               </div>
             </div>
 
@@ -278,8 +184,8 @@ export const GeminiChatbox: React.FC<GeminiChatboxProps> = ({
                 type="button"
                 id="gemini-chatbot-reset-btn"
                 className="p-1.5 rounded-md text-neutral-400 hover:text-white hover:bg-neutral-800 transition-colors"
-                title="Reset conversation history"
-                aria-label="Reset conversation history"
+                title="Reset conversation"
+                aria-label="Reset conversation"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
               </button>
@@ -295,56 +201,22 @@ export const GeminiChatbox: React.FC<GeminiChatboxProps> = ({
             </div>
           </div>
 
-          {/* Role & Model Selector Pill Strip */}
-          <div className="px-3 py-2 bg-neutral-100 border-b border-neutral-200 shrink-0">
-            <div className="flex items-center justify-between mb-1.5 px-0.5">
-              <span className="font-mono text-[9px] uppercase tracking-wider text-neutral-500 font-semibold">
-                Chatbot Persona & Gemini Model
-              </span>
-              <span className="font-mono text-[9px] text-neutral-400">
-                {currentRoleConfig.description}
-              </span>
+          {/* Suggested Starter Query Chips (Visible on fresh thread) */}
+          {messages.length <= 1 && (
+            <div className="px-3 py-2 bg-neutral-100 border-b border-neutral-200 overflow-x-auto whitespace-nowrap scrollbar-none flex gap-1.5 shrink-0">
+              {SUGGESTED_QUERIES.map((q) => (
+                <button
+                  key={q}
+                  onClick={() => handleSendMessage(q)}
+                  type="button"
+                  disabled={isLoading}
+                  className="px-2.5 py-1 rounded-full text-[10px] font-mono text-neutral-700 bg-white border border-neutral-300 hover:border-neutral-900 hover:text-neutral-950 transition-colors shrink-0 disabled:opacity-50 cursor-pointer shadow-2xs"
+                >
+                  {q}
+                </button>
+              ))}
             </div>
-
-            <div className="grid grid-cols-3 gap-1.5" role="tablist" aria-label="Chatbot Role Selection">
-              {(Object.keys(ROLES) as ChatbotRole[]).map((roleKey) => {
-                const role = ROLES[roleKey];
-                const Icon = role.icon;
-                const isActive = activeRole === roleKey;
-                return (
-                  <button
-                    key={role.id}
-                    id={`chatbot-role-tab-${role.id}`}
-                    type="button"
-                    onClick={() => handleRoleChange(roleKey)}
-                    className={`flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-md text-[11px] font-sans transition-all text-left ${
-                      isActive
-                        ? 'bg-neutral-950 text-neutral-50 font-medium shadow-xs border border-neutral-900'
-                        : 'bg-white text-neutral-700 hover:bg-neutral-200/80 border border-neutral-300'
-                    }`}
-                  >
-                    <Icon className={`w-3 h-3 ${isActive ? 'text-emerald-400' : 'text-neutral-500'}`} />
-                    <span className="truncate">{role.name}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Suggested Query Chips */}
-          <div className="px-3 py-1.5 bg-neutral-50 border-b border-neutral-200/70 overflow-x-auto whitespace-nowrap scrollbar-none flex gap-1.5 shrink-0">
-            {currentRoleConfig.suggestedQueries.map((q) => (
-              <button
-                key={q}
-                onClick={() => handleSendMessage(q)}
-                type="button"
-                disabled={isLoading}
-                className="px-2.5 py-1 rounded-full text-[10px] font-mono text-neutral-700 bg-white border border-neutral-300 hover:border-neutral-900 hover:text-neutral-950 transition-colors shrink-0 disabled:opacity-50 cursor-pointer shadow-2xs"
-              >
-                {q}
-              </button>
-            ))}
-          </div>
+          )}
 
           {/* Messages Scrollable Thread */}
           <div
@@ -361,13 +233,8 @@ export const GeminiChatbox: React.FC<GeminiChatboxProps> = ({
                 >
                   <div className="flex items-center gap-2 mb-1 px-1">
                     <span className="font-mono text-[9px] uppercase tracking-widest text-neutral-400">
-                      {isUser ? 'YOU' : isError ? 'NOTICE' : 'ASK AI'}
+                      {isUser ? 'YOU' : isError ? 'NOTICE' : 'AI ASSISTANT'}
                     </span>
-                    {!isUser && msg.modelUsed && !isError && (
-                      <span className="font-mono text-[8px] px-1 py-0.2 rounded bg-neutral-200 text-neutral-600">
-                        {msg.modelUsed}
-                      </span>
-                    )}
                     {msg.timestamp && (
                       <span className="font-mono text-[9px] text-neutral-400">
                         {msg.timestamp}
@@ -401,15 +268,12 @@ export const GeminiChatbox: React.FC<GeminiChatboxProps> = ({
               <div className="flex flex-col items-start">
                 <div className="flex items-center gap-2 mb-1 px-1">
                   <span className="font-mono text-[9px] uppercase tracking-widest text-neutral-400">
-                    ASK AI
-                  </span>
-                  <span className="font-mono text-[8px] px-1 py-0.2 rounded bg-neutral-200 text-neutral-600">
-                    {currentRoleConfig.model}
+                    AI ASSISTANT
                   </span>
                 </div>
                 <div className="p-3 rounded-lg bg-neutral-200/60 text-neutral-700 border border-neutral-300/80 rounded-bl-none flex items-center gap-2 font-mono text-xs">
                   <Sparkles className="w-3.5 h-3.5 text-neutral-800 animate-spin" />
-                  <span>Gemini is generating response...</span>
+                  <span>Generating response...</span>
                 </div>
               </div>
             )}
@@ -428,7 +292,7 @@ export const GeminiChatbox: React.FC<GeminiChatboxProps> = ({
               ref={inputRef}
               id="gemini-chatbot-input-field"
               type="text"
-              placeholder={`Ask the ${currentRoleConfig.name} (${currentRoleConfig.model})...`}
+              placeholder="Ask about projects, capabilities, or availability..."
               value={input}
               onChange={(e) => setInput(e.target.value)}
               disabled={isLoading}
