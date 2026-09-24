@@ -6,11 +6,9 @@ import { HeroData } from '../data/types.ts';
 // 30 seconds stale time threshold to align with CDN invalidation propagation
 const STALE_TIME_MS = 30 * 1000;
 
-interface HeroSectionProps {
-  onOpenAiChat?: () => void;
-}
+interface HeroSectionProps {}
 
-export const HeroSection: React.FC<HeroSectionProps> = ({ onOpenAiChat }) => {
+export const HeroSection: React.FC<HeroSectionProps> = () => {
   const [heroData, setHeroData] = useState<HeroData | null>(null);
   const [detectedRatio, setDetectedRatio] = useState<'9:16' | '16:9'>('9:16');
   const [isMuted, setIsMuted] = useState(true);

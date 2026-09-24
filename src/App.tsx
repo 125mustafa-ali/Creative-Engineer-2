@@ -11,8 +11,8 @@ import { WorkSection } from './components/WorkSection.tsx';
 import { ProjectModal } from './components/ProjectModal.tsx';
 import { ContactForm } from './components/ContactForm.tsx';
 import { Footer } from './components/Footer.tsx';
-import { GeminiChatbox } from './components/GeminiChatbox.tsx';
 import { StudioCMSModal } from './components/StudioCMSModal.tsx';
+import { AiChatAssistant } from './components/AiChatAssistant.tsx';
 import type { PortfolioItem } from './types.ts';
 import StudioPage from '../app/studio/[[...tool]]/page.tsx';
 
@@ -25,7 +25,6 @@ export default function App() {
   });
 
   const [selectedProject, setSelectedProject] = useState<PortfolioItem | null>(null);
-  const [isAiChatOpen, setIsAiChatOpen] = useState(false);
   const [isCmsModalOpen, setIsCmsModalOpen] = useState(false);
 
   useEffect(() => {
@@ -56,7 +55,7 @@ export default function App() {
       {/* Main Content Container with Horizontal Padding */}
       <main className="max-w-6xl mx-auto px-6 w-full flex-1">
         {/* Phase 4.1: Hero & Studio Notice */}
-        <HeroSection onOpenAiChat={() => setIsAiChatOpen(true)} />
+        <HeroSection />
 
         {/* Phase 4.2: Capabilities */}
         <CapabilitiesSection />
@@ -78,17 +77,14 @@ export default function App() {
         onClose={() => setSelectedProject(null)}
       />
 
-      {/* Multi-Turn Ask AI */}
-      <GeminiChatbox
-        isOpen={isAiChatOpen}
-        onToggle={() => setIsAiChatOpen(!isAiChatOpen)}
-      />
-
       {/* Isolated Sanity Studio Architecture Modal */}
       <StudioCMSModal
         isOpen={isCmsModalOpen}
         onClose={() => setIsCmsModalOpen(false)}
       />
+
+      {/* Grounded Gemini AI Assistant Widget */}
+      <AiChatAssistant />
     </div>
   );
 }

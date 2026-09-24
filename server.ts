@@ -18,7 +18,7 @@ async function startServer() {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
   });
 
-  // Grounded AI Chat Assistant route (shares identical handler with Vercel serverless function)
+  // AI Chat Assistant endpoint
   app.all('/api/chat', (req, res) => chatHandler(req, res));
 
   // Vite middleware for development

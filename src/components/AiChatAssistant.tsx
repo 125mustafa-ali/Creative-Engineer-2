@@ -1,45 +1,48 @@
 import React, { useState, useRef, useEffect } from 'react';
-import Markdown from 'react-markdown';
-import { X, Send, RotateCcw, Bot, Sparkles, AlertCircle } from 'lucide-react';
-
-export type ChatbotRole = 'studio-guide' | string;
+import { MessageCircle, X, Send, RotateCcw, AlertCircle, Loader2 } from 'lucide-react';
 
 export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
   content: string;
+  isError?: boolean;
   timestamp?: string;
 }
 
-export interface GeminiChatboxProps {
-  isOpen: boolean;
-  onToggle: () => void;
+export interface AiChatAssistantProps {
+  isOpen?: boolean;
+  onToggle?: () => void;
 }
 
-const INITIAL_GREETING =
-  'Hi there! I’m Mustafa’s AI assistant, grounded directly in his portfolio and studio data. How can I help you explore his work today?';
+const WELCOME_GREETING =
+  "Hi! I'm Mustafa's AI assistant, grounded directly in his live portfolio and studio data. What would you like to know about his projects, capabilities, or availability?";
 
-const SUGGESTED_QUERIES = [
+const STARTER_PROMPTS = [
   'What are Mustafa’s core capabilities?',
-  'Tell me about the Security Automation Playbook.',
-  'What commercial storytelling projects exist?',
-  'Are you accepting new client projects?',
+  'Tell me about recent projects',
+  'Is Mustafa accepting new client work?',
+  'How can I get in touch with the studio?',
 ];
 
-export const GeminiChatbox: React.FC<GeminiChatboxProps> = ({
-  isOpen,
-  onToggle,
+export const AiChatAssistant: React.FC<AiChatAssistantProps> = ({
+  isOpen: controlledIsOpen,
+  onToggle: controlledOnToggle,
 }) => {
+  const [internalIsOpen, setInternalIsOpen] = useState(false);
+  const isOpen = controlledIsOpen !== undefined ? controlledIsOpen : internalIsOpen;
+  const toggleChat = controlledOnToggle || (() => setInternalIsOpen((prev) => !prev));
+
   const [messages, setMessages] = useState<ChatMessage[]>(() => [
     {
-      id: 'msg-init',
+      id: 'welcome-msg',
       role: 'assistant',
-      content: INITIAL_GREETING,
+      content: WELCOME_GREETING,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     },
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -54,8 +57,8 @@ export const GeminiChatbox: React.FC<GeminiChatboxProps> = ({
     }
   }, [isOpen, messages, isLoading]);
 
-  const handleSendMessage = async (queryText?: string) => {
-    const textToSend = queryText || input;
+  const handleSendMessage = async (textOverride?: string) => {
+    const textToSend = textOverride || input;
     if (!textToSend.trim() || isLoading) return;
 
     const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -72,9 +75,9 @@ export const GeminiChatbox: React.FC<GeminiChatboxProps> = ({
     setIsLoading(true);
 
     try {
-      // Build conversation history excluding initial greeting or error banners
+      // Multi-turn history, ignoring welcome and error notices
       const payloadHistory = messages
-        .filter((m) => !m.id.startsWith('err-') && m.id !== 'msg-init')
+        .filter((m) => !m.isError && m.id !== 'welcome-msg')
         .map((m) => ({
           role: m.role === 'user' ? 'user' : 'model',
           content: m.content,
@@ -88,38 +91,59 @@ export const GeminiChatbox: React.FC<GeminiChatboxProps> = ({
         body: JSON.stringify({
           message: textToSend.trim(),
           history: payloadHistory,
-          role: 'studio-guide',
         }),
       });
 
+      const contentType = res.headers.get('content-type') || '';
+
+      // Bulletproof check: 503 or HTML response (cloud container warmup / gateway)
+      if (res.status === 503 || contentType.includes('text/html')) {
+        throw new Error('Waking up the AI, please wait a moment and try again.');
+      }
+
       if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.error || `Gemini API server error (${res.status})`);
+        let errorMsg = 'Waking up the AI, please wait a moment and try again.';
+        if (contentType.includes('application/json')) {
+          try {
+            const errorJson = await res.json();
+            if (errorJson?.error && errorJson.code !== 503) {
+              errorMsg = errorJson.error;
+            }
+          } catch (_) {}
+        }
+        throw new Error(errorMsg);
+      }
+
+      if (!contentType.includes('application/json')) {
+        throw new Error('Waking up the AI, please wait a moment and try again.');
       }
 
       const data = await res.json();
-      if (!data.reply) {
-        throw new Error('No response text received from Gemini model.');
+      if (!data || typeof data.reply !== 'string' || !data.reply.trim()) {
+        throw new Error('Waking up the AI, please wait a moment and try again.');
       }
 
       const assistantMessage: ChatMessage = {
-        id: `ast-${Date.now()}`,
+        id: `ai-${Date.now()}`,
         role: 'assistant',
-        content: data.reply,
+        content: data.reply.trim(),
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
 
       setMessages((prev) => [...prev, assistantMessage]);
     } catch (err: any) {
-      const errorMessage =
-        err?.message ||
-        'Unable to connect to the Gemini API right now. Please try again.';
+      const messageToDisplay =
+        err?.message?.includes('Waking up the AI') || !err?.message
+          ? 'Waking up the AI, please wait a moment and try again.'
+          : err.message;
+
       setMessages((prev) => [
         ...prev,
         {
           id: `err-${Date.now()}`,
           role: 'assistant',
-          content: `⚠️ ${errorMessage}`,
+          isError: true,
+          content: messageToDisplay,
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         },
       ]);
@@ -128,51 +152,51 @@ export const GeminiChatbox: React.FC<GeminiChatboxProps> = ({
     }
   };
 
-  const resetChat = () => {
+  const handleResetChat = () => {
     setMessages([
       {
-        id: `msg-reset-${Date.now()}`,
+        id: `welcome-${Date.now()}`,
         role: 'assistant',
-        content: INITIAL_GREETING,
+        content: WELCOME_GREETING,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       },
     ]);
   };
 
   return (
-    <div id="gemini-chatbot-container" className="fixed bottom-6 right-6 z-50">
+    <div id="ai-chat-assistant-container" className="fixed bottom-6 right-6 z-50 font-sans">
       {!isOpen ? (
         <button
-          onClick={onToggle}
-          id="gemini-chatbot-floating-button"
+          onClick={toggleChat}
+          id="ai-chat-open-button"
           type="button"
-          className="group inline-flex items-center gap-2.5 px-5 py-3 rounded-full bg-neutral-950 text-neutral-50 shadow-2xl hover:bg-neutral-800 transition-all duration-300 border border-neutral-800 hover:scale-105 active:scale-95 cursor-pointer font-sans text-xs sm:text-sm font-medium tracking-wide"
-          aria-label="Open Ask AI"
+          className="group inline-flex items-center gap-2.5 px-4 py-3 rounded-full bg-neutral-950 text-neutral-50 shadow-xl hover:bg-neutral-800 transition-all duration-200 border border-neutral-800 cursor-pointer font-sans text-sm font-medium hover:scale-105 active:scale-95"
+          aria-label="Open AI Assistant"
         >
           <span className="relative flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
           </span>
-          <Bot className="w-4 h-4 text-emerald-400" />
+          <MessageCircle className="w-4 h-4 text-emerald-400" />
           <span>Ask AI</span>
         </button>
       ) : (
         <div
-          id="gemini-chatbot-window"
-          className="w-[92vw] sm:w-[440px] md:w-[480px] h-[560px] max-h-[88vh] bg-neutral-50 border border-neutral-300 rounded-xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-6 duration-200"
+          id="ai-chat-window"
+          className="w-[92vw] sm:w-[420px] md:w-[440px] h-[550px] max-h-[85vh] bg-white border border-neutral-300 rounded-xl shadow-2xl flex flex-col overflow-hidden font-sans"
         >
-          {/* Clean, Minimal Header */}
-          <div className="flex items-center justify-between px-4 py-3 bg-neutral-950 text-neutral-50 shrink-0 border-b border-neutral-800">
+          {/* Header */}
+          <div className="flex items-center justify-between p-3 bg-neutral-950 text-neutral-50 shrink-0 border-b border-neutral-800">
             <div className="flex items-center gap-2.5">
-              <div className="w-7 h-7 rounded-lg bg-neutral-800 border border-neutral-700 flex items-center justify-center text-emerald-400">
-                <Bot className="w-4 h-4" />
+              <div className="w-7 h-7 rounded-lg bg-neutral-800 flex items-center justify-center text-emerald-400 border border-neutral-700">
+                <MessageCircle className="w-4 h-4" />
               </div>
               <div>
-                <h3 className="font-sans text-xs font-semibold text-white leading-tight">
+                <h3 className="text-xs font-semibold text-white leading-tight">
                   Ask AI
                 </h3>
                 <p className="text-[10px] text-neutral-400 flex items-center gap-1.5 leading-tight mt-0.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block"></span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />
                   <span>Grounded in Studio Data</span>
                 </p>
               </div>
@@ -180,85 +204,72 @@ export const GeminiChatbox: React.FC<GeminiChatboxProps> = ({
 
             <div className="flex items-center gap-1">
               <button
-                onClick={resetChat}
+                onClick={handleResetChat}
                 type="button"
-                id="gemini-chatbot-reset-btn"
-                className="p-1.5 rounded-md text-neutral-400 hover:text-white hover:bg-neutral-800 transition-colors"
+                className="p-1.5 rounded-md text-neutral-400 hover:text-white hover:bg-neutral-800 transition-colors cursor-pointer"
                 title="Reset conversation"
                 aria-label="Reset conversation"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
               </button>
               <button
-                onClick={onToggle}
-                id="gemini-chatbot-close-btn"
+                onClick={toggleChat}
                 type="button"
-                className="p-1.5 rounded-md text-neutral-400 hover:text-white hover:bg-neutral-800 transition-colors"
-                aria-label="Close Ask AI window"
+                className="p-1.5 rounded-md text-neutral-400 hover:text-white hover:bg-neutral-800 transition-colors cursor-pointer"
+                aria-label="Close chat window"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
           </div>
 
-          {/* Suggested Starter Query Chips (Visible on fresh thread) */}
+          {/* Quick Starter Prompts (shown when only welcome message is present) */}
           {messages.length <= 1 && (
-            <div className="px-3 py-2 bg-neutral-100 border-b border-neutral-200 overflow-x-auto whitespace-nowrap scrollbar-none flex gap-1.5 shrink-0">
-              {SUGGESTED_QUERIES.map((q) => (
+            <div className="p-2.5 bg-neutral-50 border-b border-neutral-200 overflow-x-auto whitespace-nowrap scrollbar-none flex gap-1.5 shrink-0">
+              {STARTER_PROMPTS.map((prompt) => (
                 <button
-                  key={q}
-                  onClick={() => handleSendMessage(q)}
+                  key={prompt}
+                  onClick={() => handleSendMessage(prompt)}
                   type="button"
                   disabled={isLoading}
-                  className="px-2.5 py-1 rounded-full text-[10px] font-mono text-neutral-700 bg-white border border-neutral-300 hover:border-neutral-900 hover:text-neutral-950 transition-colors shrink-0 disabled:opacity-50 cursor-pointer shadow-2xs"
+                  className="px-2.5 py-1 rounded-full text-xs font-sans text-neutral-700 bg-white border border-neutral-300 hover:border-neutral-900 hover:text-neutral-950 transition-colors shrink-0 disabled:opacity-50 cursor-pointer shadow-2xs"
                 >
-                  {q}
+                  {prompt}
                 </button>
               ))}
             </div>
           )}
 
-          {/* Messages Scrollable Thread */}
+          {/* Chat Messages Thread */}
           <div
-            id="gemini-chatbot-messages-thread"
-            className="flex-1 p-4 overflow-y-auto space-y-4 font-sans text-xs sm:text-sm"
+            id="ai-chat-messages-thread"
+            className="flex-1 p-3 overflow-y-auto space-y-3 font-sans text-sm"
           >
             {messages.map((msg) => {
               const isUser = msg.role === 'user';
-              const isError = msg.id.startsWith('err-');
               return (
                 <div
                   key={msg.id}
                   className={`flex flex-col ${isUser ? 'items-end' : 'items-start'}`}
                 >
-                  <div className="flex items-center gap-2 mb-1 px-1">
-                    <span className="font-mono text-[9px] uppercase tracking-widest text-neutral-400">
-                      {isUser ? 'YOU' : isError ? 'NOTICE' : 'AI ASSISTANT'}
-                    </span>
-                    {msg.timestamp && (
-                      <span className="font-mono text-[9px] text-neutral-400">
-                        {msg.timestamp}
-                      </span>
-                    )}
+                  <div className="flex items-center gap-2 mb-1 px-1 text-[10px] text-neutral-400 uppercase tracking-wider font-mono">
+                    <span>{isUser ? 'YOU' : msg.isError ? 'NOTICE' : 'ASSISTANT'}</span>
+                    {msg.timestamp && <span>{msg.timestamp}</span>}
                   </div>
 
                   <div
-                    className={`p-3 rounded-lg max-w-[92%] leading-relaxed ${
+                    className={`p-3 rounded-lg max-w-[90%] text-sm leading-relaxed whitespace-pre-wrap ${
                       isUser
-                        ? 'bg-neutral-950 text-neutral-50 rounded-br-none shadow-xs'
-                        : isError
-                        ? 'bg-amber-50 text-amber-950 border border-amber-300/80 rounded-bl-none flex items-start gap-2'
-                        : 'bg-neutral-200/60 text-neutral-900 border border-neutral-300/80 rounded-bl-none'
+                        ? 'bg-neutral-950 text-white rounded-br-xs'
+                        : msg.isError
+                        ? 'bg-neutral-100 text-neutral-800 border border-neutral-300 rounded-bl-xs flex items-start gap-2.5'
+                        : 'bg-neutral-100 text-neutral-900 border border-neutral-200/80 rounded-bl-xs'
                     }`}
                   >
-                    {isError && <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />}
-                    {isUser ? (
-                      <p className="whitespace-pre-wrap">{msg.content}</p>
-                    ) : (
-                      <div className="prose prose-sm prose-invert prose-headings:text-base prose-headings:font-bold prose-p:leading-snug max-w-none">
-                        <Markdown>{msg.content}</Markdown>
-                      </div>
+                    {msg.isError && (
+                      <AlertCircle className="w-4 h-4 text-neutral-600 shrink-0 mt-0.5" />
                     )}
+                    <span>{msg.content}</span>
                   </div>
                 </div>
               );
@@ -266,31 +277,28 @@ export const GeminiChatbox: React.FC<GeminiChatboxProps> = ({
 
             {isLoading && (
               <div className="flex flex-col items-start">
-                <div className="flex items-center gap-2 mb-1 px-1">
-                  <span className="font-mono text-[9px] uppercase tracking-widest text-neutral-400">
-                    AI ASSISTANT
-                  </span>
+                <div className="flex items-center gap-2 mb-1 px-1 text-[10px] text-neutral-400 uppercase tracking-wider font-mono">
+                  <span>ASSISTANT</span>
                 </div>
-                <div className="p-3 rounded-lg bg-neutral-200/60 text-neutral-700 border border-neutral-300/80 rounded-bl-none flex items-center gap-2 font-mono text-xs">
-                  <Sparkles className="w-3.5 h-3.5 text-neutral-800 animate-spin" />
-                  <span>Generating response...</span>
+                <div className="p-3 rounded-lg bg-neutral-100 text-neutral-600 border border-neutral-200/80 rounded-bl-xs flex items-center gap-2 text-xs font-sans">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-neutral-700" />
+                  <span>Thinking...</span>
                 </div>
               </div>
             )}
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Multi-turn Input Form */}
+          {/* Input Form */}
           <form
             onSubmit={(e) => {
               e.preventDefault();
               handleSendMessage();
             }}
-            className="p-3 bg-white border-t border-neutral-200 flex items-center gap-2 shrink-0"
+            className="p-3 bg-white border-t border-neutral-200 flex items-center gap-2 shrink-0 font-sans"
           >
             <input
               ref={inputRef}
-              id="gemini-chatbot-input-field"
               type="text"
               placeholder="Ask about projects, capabilities, or availability..."
               value={input}
@@ -299,13 +307,12 @@ export const GeminiChatbox: React.FC<GeminiChatboxProps> = ({
               className="flex-1 px-3 py-2 rounded-md border border-neutral-300 bg-neutral-50 text-neutral-900 placeholder:text-neutral-400 font-sans text-xs focus:outline-hidden focus:ring-1 focus:ring-neutral-950 focus:border-neutral-950 disabled:opacity-50"
             />
             <button
-              id="gemini-chatbot-send-btn"
               type="submit"
               disabled={isLoading || !input.trim()}
-              className="p-2.5 rounded-md bg-neutral-950 text-neutral-50 hover:bg-neutral-800 disabled:opacity-40 disabled:hover:bg-neutral-950 transition-colors shrink-0 cursor-pointer"
-              aria-label="Send message to Ask AI"
+              className="p-2 rounded-md bg-neutral-950 text-neutral-50 hover:bg-neutral-800 disabled:opacity-40 disabled:hover:bg-neutral-950 transition-colors shrink-0 cursor-pointer"
+              aria-label="Send message"
             >
-              <Send className="w-3.5 h-3.5" />
+              <Send className="w-4 h-4" />
             </button>
           </form>
         </div>
@@ -313,6 +320,3 @@ export const GeminiChatbox: React.FC<GeminiChatboxProps> = ({
     </div>
   );
 };
-
-// Backwards compatibility alias
-export const AiChatAssistant = GeminiChatbox;

@@ -1,8 +1,8 @@
 import 'dotenv/config';
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenAI, Type } from '@google/genai';
 import { createClient } from '@sanity/client';
 
-// Direct initialization of Sanity client using process.env variables (with fallbacks)
+// 1. Initialize Read-Only Sanity Client
 const sanityProjectId =
   process.env.NEXT_PUBLIC_SANITY_PROJECT_ID ||
   process.env.SANITY_PROJECT_ID ||
@@ -17,11 +17,11 @@ const sanityClient = createClient({
   projectId: sanityProjectId,
   dataset: sanityDataset,
   apiVersion: '2024-01-01',
-  useCdn: false, // Ensure fresh, un-cached portfolio data for AI grounding
+  useCdn: false, // Always fetch live un-cached studio data
 });
 
 /**
- * Fetch unified portfolio context directly from Sanity CMS
+ * Fetch fresh portfolio & studio context directly from Sanity CMS
  */
 async function fetchSanityPortfolioContext() {
   const query = `{
@@ -43,68 +43,42 @@ async function fetchSanityPortfolioContext() {
     const data = await sanityClient.fetch(query);
     return data || {};
   } catch (error) {
-    console.error('Error fetching live portfolio context from Sanity:', error);
+    console.error('Error querying Sanity portfolio context for AI grounding:', error);
     return {};
   }
 }
 
 /**
- * Build grounded system instructions injecting the Sanity CMS context and specific chatbot role
+ * Build grounded system instruction incorporating live Sanity data
  */
-function buildSystemInstruction(sanityContext, role = 'general') {
+function buildSystemInstruction(sanityContext) {
   const contextString = JSON.stringify(sanityContext, null, 2);
 
-  let rolePersona = '';
-  switch (role) {
-    case 'complex':
-    case 'technical-architect':
-      rolePersona = `ROLE: Gemini Senior Technical Architect & Systems Engineer.
-You specialize in deep technical queries: automated incident pipelines (n8n, Webhooks, Fortinet, Cisco ISE), cloud & network infrastructure, React/TypeScript architecture, and AI-driven content systems.
-Provide rigorous, technically precise, and detailed architectural breakdowns.`;
-      break;
-
-    case 'fast':
-    case 'fast-concierge':
-      rolePersona = `ROLE: Gemini Fast Studio Concierge.
-Provide rapid, ultra-concise, and crisp responses. Focus on immediate clarity regarding studio availability (Q3/Q4 2026), studio locations (Dubai & Hyderabad), booking timeline, and direct contacts (125.mustafa@gmail.com, +971 545648341). Use brief bullet points.`;
-      break;
-
-    case 'general':
-    case 'studio-guide':
-    default:
-      rolePersona = `ROLE: Gemini Studio Ambassador & Portfolio Guide.
-Your role is to help visitors, prospective clients, and collaborators explore Mustafa's creative engineering practice, featured case studies, multidisciplinary philosophy, and capabilities.`;
-      break;
-  }
-
-  return `${rolePersona}
-
-You are the official grounded Gemini chatbot for Mustafa's Creative Engineer portfolio.
+  return `You are Mustafa's official AI assistant for his Creative Engineering portfolio website.
+Your role is to help visitors, prospective clients, and collaborators explore Mustafa's background, technical capabilities, projects, and availability.
 
 LIVE PORTFOLIO CONTEXT FROM SANITY CMS:
----
+----------------------------------------
 ${contextString}
----
+----------------------------------------
 
-STUDIO INFORMATION:
-- Practice: Creative Engineering (Mustafa)
-- Focus: Bridging emergent technology and human storytelling. Building automated incident pipelines (n8n, Webhooks, Fortinet, Cisco ISE), high-performance digital platforms (React, Next.js, Vite, Tailwind CSS), AI-driven systems (NotebookLM, Prompt Engineering), and commercial visual & motion storytelling.
-- Atelier Locations: Dubai and Hyderabad
-- Current Status: Accepting select projects — Q3/Q4 2026
-- Direct Contact: 125.mustafa@gmail.com
-- Studio Phone: +971 545648341
+STUDIO DETAILS:
+- Name / Practice: Mustafa — Creative Engineer
+- Key Disciplines: Smart Workflow Automation (n8n, Webhooks, APIs), Modern Web Architecture (React, TypeScript, Next.js, Vite, Tailwind CSS), AI Systems & Data Structuring, and Motion / Visual Storytelling.
+- Locations: Dubai and Hyderabad
+- Current Availability: Accepting select projects for Q3/Q4 2026
+- Direct Contact Email: 125.mustafa@gmail.com
+- Direct Contact Phone: +971 545648341
 
 GUIDELINES:
-1. Grounding: Answer strictly and faithfully based on the live Sanity portfolio data and studio details above.
-2. If asked about specific projects (e.g., Security Automation Playbook, Interactive React Portfolio, Commercial Storytelling Concepts, AI Content Systems), provide accurate descriptions from the portfolio context.
-3. If asked about something outside the recorded portfolio, capabilities, or studio notice, politely and warmly state that it is not currently in the studio's records, and suggest contacting Mustafa directly via email (125.mustafa@gmail.com) or the "Let's Talk" form.
-4. Tone: Warm, articulate, professional, confident, and conversational.
-5. Multi-turn dialogue: Maintain clear context across multiple turns of the conversation.
-6. Formatting: Use clean Markdown formatting when helpful.`;
+1. Always base your answers strictly and accurately on the live Sanity portfolio data and studio details above.
+2. Provide clear, direct, and well-structured responses. Use clean spacing and bullet points where helpful.
+3. If asked about something outside Mustafa's portfolio or capabilities, politely mention that it is not in the studio's records and suggest contacting Mustafa directly at 125.mustafa@gmail.com.
+4. Keep the tone warm, professional, articulate, and welcoming.`;
 }
 
 /**
- * Serverless API handler compatible with Vercel, Express, and standard Web runtimes
+ * Serverless / Express API route handler
  */
 export default async function handler(req, res) {
   // CORS Headers
@@ -133,7 +107,6 @@ export default async function handler(req, res) {
     });
   }
 
-  // Helper to send JSON responses across Node.js / Express and Web environments
   const sendResponse = (statusCode, data) => {
     if (res && typeof res.status === 'function') {
       return res.status(statusCode).json(data);
@@ -148,60 +121,44 @@ export default async function handler(req, res) {
   };
 
   if (req.method !== 'POST') {
-    return sendResponse(405, { error: 'Method Not Allowed. Expected a POST request.' });
+    return sendResponse(405, { error: 'Method Not Allowed. POST required.' });
   }
 
   try {
-    // Parse incoming request body
-    let message;
-    let history;
-    let role = 'studio-guide';
-    let requestedModel;
-    let taskType;
-
+    // Parse request body
+    let body = req.body;
     if (typeof req.json === 'function' && (!req.body || typeof req.body.on !== 'function')) {
       try {
-        const jsonBody = await req.json();
-        message = jsonBody?.message;
-        history = jsonBody?.history;
-        role = jsonBody?.role || 'studio-guide';
-        requestedModel = jsonBody?.model;
-        taskType = jsonBody?.taskType;
+        body = await req.json();
       } catch (_) {}
-    } else {
-      let body = req.body;
-      if (typeof body === 'string') {
-        try {
-          body = JSON.parse(body);
-        } catch (_) {}
-      }
-      message = body?.message;
-      history = body?.history;
-      role = body?.role || 'studio-guide';
-      requestedModel = body?.model;
-      taskType = body?.taskType;
+    } else if (typeof body === 'string') {
+      try {
+        body = JSON.parse(body);
+      } catch (_) {}
     }
+
+    const message = body?.message;
+    const history = body?.history;
 
     if (!message || typeof message !== 'string' || !message.trim()) {
-      return sendResponse(400, { error: 'Valid message string is required.' });
+      return sendResponse(400, { error: 'A valid message string is required.' });
     }
 
-    // Verify GEMINI_API_KEY
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
       return sendResponse(500, {
-        error: 'GEMINI_API_KEY environment variable is missing or not configured.',
+        error: 'GEMINI_API_KEY is not configured on the server.',
         success: false,
       });
     }
 
-    // 1. Fetch live portfolio context directly from Sanity CMS
+    // 1. Fetch live Sanity CMS data
     const sanityContext = await fetchSanityPortfolioContext();
 
-    // 2. Inject context and role into system instructions
-    const systemInstruction = buildSystemInstruction(sanityContext, role);
+    // 2. Build system prompt
+    const systemInstruction = buildSystemInstruction(sanityContext);
 
-    // 3. Initialize Google Gen AI SDK correctly with GEMINI_API_KEY
+    // 3. Initialize GoogleGenAI SDK
     const ai = new GoogleGenAI({
       apiKey,
       httpOptions: {
@@ -211,10 +168,10 @@ export default async function handler(req, res) {
       },
     });
 
-    // 4. Build multi-turn conversation contents
+    // 4. Build multi-turn contents array
     const conversationContents = [];
-    if (Array.isArray(history) && history.length > 0) {
-      for (const item of history.slice(-12)) {
+    if (Array.isArray(history)) {
+      for (const item of history.slice(-10)) {
         if (item && item.content && typeof item.content === 'string') {
           conversationContents.push({
             role: item.role === 'user' ? 'user' : 'model',
@@ -229,64 +186,78 @@ export default async function handler(req, res) {
       parts: [{ text: message.trim() }],
     });
 
-    // 5. Select Gemini model
-    let model = requestedModel || process.env.GEMINI_MODEL || 'gemini-3.6-flash';
+    // 5. Generate content with strict structured JSON output
+    const modelsToTry = ['gemini-3.6-flash', 'gemini-3.1-flash-lite', 'gemini-3.8-flash'];
+    let lastError = null;
+    let replyText = '';
 
-    let response;
-    try {
-      response = await ai.models.generateContent({
-        model,
-        contents: conversationContents,
-        config: {
-          systemInstruction,
-          temperature: 0.4,
-        },
-      });
-    } catch (modelErr) {
-      if (model !== 'gemini-3.6-flash') {
-        console.warn(`Model ${model} failed, falling back to gemini-3.6-flash:`, modelErr);
-        model = 'gemini-3.6-flash';
-        response = await ai.models.generateContent({
-          model,
-          contents: conversationContents,
-          config: {
-            systemInstruction,
-            temperature: 0.4,
-          },
-        });
-      } else {
-        throw modelErr;
+    for (const model of modelsToTry) {
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          const response = await ai.models.generateContent({
+            model,
+            contents: conversationContents,
+            config: {
+              systemInstruction,
+              temperature: 0.4,
+              responseMimeType: 'application/json',
+              responseSchema: {
+                type: Type.OBJECT,
+                properties: {
+                  reply: {
+                    type: Type.STRING,
+                    description: 'The response answering the user query grounded in portfolio context.',
+                  },
+                },
+                required: ['reply'],
+              },
+            },
+          });
+
+          const rawText = response.text || '';
+          try {
+            const parsed = JSON.parse(rawText);
+            replyText = parsed.reply || rawText;
+          } catch (_) {
+            replyText = rawText;
+          }
+
+          if (replyText) {
+            lastError = null;
+            break;
+          }
+        } catch (err) {
+          lastError = err;
+          console.warn(`Model ${model} attempt ${attempt + 1} error:`, err?.message || err);
+          if (attempt === 0) {
+            await new Promise((resolve) => setTimeout(resolve, 900));
+          }
+        }
       }
+      if (replyText) break;
     }
 
-    const reply = response.text || '';
+    if (lastError && !replyText) {
+      const is503 =
+        lastError?.status === 503 ||
+        lastError?.message?.includes('503') ||
+        lastError?.message?.includes('high demand') ||
+        lastError?.message?.includes('UNAVAILABLE');
+
+      return sendResponse(is503 ? 503 : 500, {
+        error: lastError?.message || 'Gemini API temporary error.',
+        success: false,
+      });
+    }
 
     return sendResponse(200, {
-      reply,
-      modelUsed: model,
-      roleUsed: role,
+      reply: replyText,
       success: true,
     });
   } catch (err) {
-    // Surface real API failures directly (such as 429 quota limits, auth errors, etc.)
-    console.error('Gemini API Error in /api/chat:', err);
-
-    let errorDetail = err?.message || 'Error processing chat query with Gemini API.';
-    let statusCode = err?.status || 500;
-
-    try {
-      const parsed = JSON.parse(errorDetail);
-      if (parsed?.error?.message) {
-        errorDetail = parsed.error.message;
-      }
-      if (parsed?.error?.code && typeof parsed.error.code === 'number') {
-        statusCode = parsed.error.code;
-      }
-    } catch (_) {}
-
-    return sendResponse(statusCode, {
-      error: errorDetail,
-      code: statusCode,
+    console.error('Unhandled error in /api/chat handler:', err);
+    return sendResponse(500, {
+      error: err?.message || 'Server error processing chat request.',
       success: false,
     });
   }
