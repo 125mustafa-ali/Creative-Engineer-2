@@ -57,7 +57,7 @@ export const CapabilitiesSection: React.FC = () => {
           </h2>
         </div>
         <p className="font-sans text-xs sm:text-sm text-neutral-600 max-w-md font-light leading-relaxed">
-          Custom digital platforms, autonomous task orchestration, and high-impact visual storytelling engineered for speed and clarity.
+          Custom digital platforms, smart workflow automation, and high-impact visual storytelling engineered for speed and clarity.
         </p>
       </div>
 
